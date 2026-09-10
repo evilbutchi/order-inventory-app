@@ -1,0 +1,24 @@
+# --- Backend (Maven / Spring Boot) ---
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+
+# --- Frontend (Vite / React) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# --- Environment / secrets (never commit Supabase credentials) ---
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.iml
+.DS_Store

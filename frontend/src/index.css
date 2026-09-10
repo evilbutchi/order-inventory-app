@@ -1,0 +1,24 @@
+:root {
+  --maroon: #800000;
+  --maroon-dark: #5c0000;
+  --maroon-light: #a52a2a;
+
+  --gold: #d4af37;
+  --gold-light: #f0d36b;
+  --gold-dark: #b8860b;
+
+  --white: #ffffff;
+  --cream: #fffaf0;
+  --text-dark: #2b1a1a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--cream);
+  color: var(--text-dark);
+}
+
