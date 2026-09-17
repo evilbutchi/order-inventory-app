@@ -1,13 +1,18 @@
 package edu.cit.berou.shop.entity;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
@@ -18,12 +23,6 @@ public class Order {
     @Column(name = "order_id")
     private Long orderId;
 
-    @Column(name = "product_id", nullable = false)
-    private String productId;
-
-    @Column(name = "quantity", nullable = false)
-    private int quantity;
-
     @Column(name = "status", nullable = false)
     private String status;
 
@@ -33,32 +32,36 @@ public class Order {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    // Line items now live in their own table (an order can span several
+    // products). cascade = ALL + orphanRemoval so saving/removing the Order
+    // saves/removes its items too - callers never persist OrderItem directly.
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<OrderItem> items = new ArrayList<>();
+
     protected Order() {
         // required by JPA
     }
 
-    public Order(String productId, int quantity, String status, String reason, Instant createdAt) {
-        this.productId = productId;
-        this.quantity = quantity;
+    public Order(String status, String reason, Instant createdAt) {
         this.status = status;
         this.reason = reason;
         this.createdAt = createdAt;
+    }
+
+    public void addItem(String productId, int quantity) {
+        items.add(new OrderItem(this, productId, quantity));
     }
 
     public Long getOrderId() {
         return orderId;
     }
 
-    public String getProductId() {
-        return productId;
-    }
-
-    public int getQuantity() {
-        return quantity;
-    }
-
     public String getStatus() {
         return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public String getReason() {
@@ -67,5 +70,9 @@ public class Order {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public List<OrderItem> getItems() {
+        return items;
     }
 }

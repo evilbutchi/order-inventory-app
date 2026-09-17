@@ -1,9 +1,15 @@
-# Order / Inventory In-Process Integration Demo
+# Order / Inventory In-Process Integration Demo — Lab 2
 
-A single Spring Boot application with two in-process modules — **Order**
-(`edu.cit.berou.shop`) and **Inventory** (`edu.cit.berou.inventory`) — sharing
-a Supabase (Postgres) database, plus a React (Vite) frontend that talks to it
-over REST.
+A single Spring Boot application with three in-process modules — **Order**
+(`edu.cit.berou.shop`), **Inventory** (`edu.cit.berou.inventory`), and
+**Notification** (`edu.cit.berou.notification`) — sharing a Supabase
+(Postgres) database, plus a React (Vite) frontend that talks to it over
+REST.
+
+Lab 2 extends the Lab 1 single-item demo with: multi-item orders with
+all-or-nothing rollback, order cancellation with restock, read endpoints for
+live inventory/order data, an in-process event-driven Notification module,
+and a low-stock auto-reorder rule.
 
 ## Project structure
 
@@ -11,52 +17,37 @@ over REST.
 order-inventory-app/
 ├── backend/     Spring Boot app (Java 17, Spring Boot 3.5.5)
 ├── frontend/    React + Vite app
-├── sql/         schema.sql - table creation + seed data
+├── sql/         schema.sql - table creation + seed data (run this first)
 └── README.md
 ```
 
 ## 1. Supabase setup
 
-1. Go to [supabase.com](https://supabase.com), sign in, and click **New project**.
-2. Pick an org, name the project (e.g. `order-inventory-demo`), set a database
-   password (save it — you'll need it below), pick a region, and create the
-   project.
-3. Once it's provisioned, open **SQL Editor → New query**, paste in the
-   contents of [`sql/schema.sql`](sql/schema.sql), and run it. This creates
-   `inventory` (seeded with P100/P200/P300) and `orders`.
-4. Click the green **Connect** button near the top of the project dashboard,
-   select the **JDBC** tab, and choose the **Session pooler** connection
-   (not "Direct connection" — that requires IPv6, which most local setups
-   don't have). Copy the URI. It looks like:
-   ```
-   jdbc:postgresql://aws-0-<region>.pooler.supabase.com:5432/postgres
-   ```
-5. You'll plug that, your DB username (with the pooler this is
-   `postgres.<project-ref>`, not just `postgres`), and the password from
-   step 2 into environment variables — never into `application.properties`
-   directly.
+1. Go to [supabase.com](https://supabase.com), sign in, and open your
+   project (or create a new one).
+2. Project Settings → Database → note your **Session pooler** connection
+   string (or direct connection URI).
+3. Open **SQL Editor → New query**, paste the contents of `sql/schema.sql`,
+   and run it. This drops and recreates `inventory`, `orders`,
+   `order_items`, and `notifications` from scratch, including seed data —
+   safe to re-run any time you want a clean slate.
 
 ## 2. Backend setup
 
-Requires Java 17 and Maven.
-
 ```bash
 cd backend
-export SUPABASE_DB_URL="jdbc:postgresql://aws-0-<region>.pooler.supabase.com:5432/postgres"
+export SUPABASE_DB_URL="jdbc:postgresql://<host>:<port>/postgres"
 export SUPABASE_DB_USERNAME="postgres.<project-ref>"
 export SUPABASE_DB_PASSWORD="<your-db-password>"
 export CORS_ALLOWED_ORIGIN="http://localhost:5173"   # optional, this is the default
-
 ./mvnw spring-boot:run
 ```
 
 (On Windows PowerShell, use `$env:SUPABASE_DB_URL = "..."` etc., or set them
-in your IDE's run configuration.) See `backend/.env.example` for the full list
-of variables. The API comes up on `http://localhost:8080`.
+in your IDE's run configuration.) See `backend/.env.example` for the full
+list of variables. The API comes up on `http://localhost:8080`.
 
 ## 3. Frontend setup
-
-Requires Node.js 18+.
 
 ```bash
 cd frontend
@@ -64,102 +55,150 @@ npm install
 npm run dev
 ```
 
-Opens on `http://localhost:5173`. If your backend runs somewhere other than
-`localhost:8080`, copy `frontend/.env.example` to `.env` and set
-`VITE_API_BASE_URL`.
+Opens on `http://localhost:5173`. Set `VITE_API_BASE_URL` in
+`frontend/.env` if the backend isn't on the default `localhost:8080`.
 
 ## 4. API
 
-**POST `/api/orders`**
+| Method | Path                        | Description                                   |
+|--------|-----------------------------|------------------------------------------------|
+| POST   | `/api/orders`                | Place a multi-item order (all-or-nothing)      |
+| GET    | `/api/orders`                | Order history, newest first, with line items   |
+| POST   | `/api/orders/{orderId}/cancel` | Cancel a confirmed order and restock its items |
+| GET    | `/api/inventory`             | Current stock for every product                |
+| GET    | `/api/notifications`         | Activity feed (confirmations, rejections, low-stock alerts) |
+
+`POST /api/orders` request body:
 
 ```json
-// request
-{ "productId": "P100", "quantity": 5 }
-
-// response (200)
-{ "status": "CONFIRMED", "reason": null, "inventory": { "productId": "P100", "name": "Wireless Mouse", "stock": 20 } }
+{ "items": [{ "productId": "P100", "quantity": 2 }, { "productId": "P200", "quantity": 1 }] }
 ```
 
-If `quantity` exceeds available stock, `status` is `"REJECTED"` and `reason`
-explains why; `inventory` reflects stock as of the rejected attempt.
+Response:
 
-**GET `/api/inventory`** — lists all products (used by the frontend dropdown).
+```json
+{
+  "orderId": 12,
+  "status": "CONFIRMED",
+  "reason": null,
+  "items": [{ "productId": "P100", "outcome": "RESERVED" }, { "productId": "P200", "outcome": "RESERVED" }],
+  "inventory": [{ "productId": "P100", "name": "Wireless Mouse", "stock": 23 }, { "productId": "P200", "name": "Mechanical Keyboard", "stock": 9 }]
+}
+```
+
+On rejection, `inventory` is empty (nothing was reserved) and each failing
+line item's `outcome` carries its specific reason; items that passed
+validation but weren't reserved (because a sibling item failed) show
+`"NOT_RESERVED"`.
 
 ## 5. Network tab evidence
 
-_Screenshots captured while testing both paths end-to-end:_
+> **Not yet captured — this section is a placeholder.** These screenshots
+> have to come from an actual run against your Supabase database; they
+> can't be generated without executing the app, so they're still on you.
+> Steps to capture each one:
+>
+> 1. Start the backend and frontend (sections 2–3 above).
+> 2. Open browser DevTools → **Network** tab, filter by `orders`,
+>    `inventory`, or `notifications` as relevant.
+> 3. Perform the action in the UI, click the resulting request, and
+>    screenshot the **Payload** and **Response** panels.
+> 4. Save each screenshot under `docs/` and reference it below.
 
-**Confirmed order** (e.g. P100, quantity within stock):
-
-`docs/network-confirmed.png`
-
-![Confirmed order network evidence](docs/network-confirmed.png)
-
-**Rejected order** (e.g. P300, quantity 0 stock, or quantity greater than
-available stock):
-
-`docs/network-rejected.png`
-
-![Rejected order network evidence](docs/network-rejected.png)
-
-> To capture these: open the browser DevTools → **Network** tab, filter by
-> `orders`, submit an order from the React form, then click the `orders`
-> request and screenshot the **Payload** and **Response** panels for both a
-> confirmed and a rejected attempt.
+- [ ] **All items succeed (CONFIRMED).** Add 2+ products to the cart,
+      submit, confirm the response shows `"status": "CONFIRMED"` and every
+      item `"RESERVED"`.
+      `docs/network-multi-confirmed.png`
+- [ ] **One item fails → whole order REJECTED, no partial reservation.**
+      Add one product with a quantity above its current stock alongside a
+      valid item, submit, confirm `"status": "REJECTED"` and — critically —
+      re-check `GET /api/inventory` afterward to confirm the *valid* item's
+      stock did **not** decrease either.
+      `docs/network-multi-rejected.png`
+- [ ] **Cancel + restock.** Cancel a confirmed order from the order history
+      panel, then screenshot `GET /api/inventory` showing the cancelled
+      order's stock restored.
+      `docs/network-cancel-restock.png`
+- [ ] **Notification feed.** Screenshot `GET /api/notifications` (or the
+      Activity feed panel) after triggering all three entry types: a
+      confirmed order, a rejected order, and a low-stock alert (order enough
+      of one product to push it under `app.inventory.low-stock-threshold`,
+      default 5).
+      `docs/network-notifications.png`
 
 ## 6. Reflection
 
-**1. In-process vs. microservices over a network.**
-Calling `InventoryService` in-process means the Order module gets a handful
-of things for free: a single method call is synchronous and either returns
-or throws, so there's no need to handle partial failure, timeouts, or
-retries — if `reserve()` returns, I know exactly what happened. Both modules
-also share one transaction, so an order write and a stock decrement commit
-or roll back together; there's no risk of the stock being decremented while
-the order write fails. There's no serialization, no network latency, and no
-separate deployment or versioning to coordinate — one JAR, one process, one
-`git push`. If I split Inventory out into its own service reachable over
-HTTP, I'd have to add back all of that: a client (REST or gRPC) with
-timeouts and retries, error handling for the service being down or slow,
-and some way to keep the "order + stock update" consistent without a shared
-database transaction — likely a saga/compensation pattern (e.g. reserve
-first, confirm or release afterward) or an outbox/event-based approach,
-plus monitoring, service discovery, and independent versioning of the
-Inventory API contract.
+**1. Keeping multi-item orders atomic in-process, and what changes over a
+network.**
 
-**2. Why package-private `InventoryServiceImpl` matters.**
-Making the implementation package-private means the compiler enforces the
-module boundary, not just convention. The Order module can only see the
-`InventoryService` interface (plus the DTOs that interface exposes) — it
-has no way to import `InventoryServiceImpl`, call implementation-specific
-methods, or reach into `InventoryRepository`/`InventoryItem` directly. If
-`InventoryServiceImpl` were `public`, nothing would stop `OrderService` from
-depending on the concrete class, bypassing the interface, or reaching past
-it into the repository layer. That would tie Order's compiled code to
-Inventory's internals, so changing how Inventory is implemented (say,
-swapping the locking strategy or the persistence layer) could break Order
-even though the public contract never changed — exactly the coupling a
-module boundary is supposed to prevent.
+`OrderService.placeOrder()` and `InventoryService.reserve()` are both
+`@Transactional`, and Spring's default propagation (`REQUIRED`) means each
+`reserve()` call inside the item loop joins the *same* transaction the
+outer method opened rather than starting its own. If a reservation still
+fails after validation passed (a race with another order), I throw, and
+that rolls back every reservation already made earlier in the loop plus
+the order itself — nothing partially commits. The up-front validation pass
+makes this rare; the transaction is the safety net for the race window,
+not the primary mechanism. Over a network, that shared transaction
+disappears — there's no single connection spanning two services. I'd need
+either a saga (reserve items individually, issue compensating "release"
+calls if a later one fails — what the in-process rollback does for free
+now) or an outbox pattern where the order is confirmed only once every
+reservation reports back, with timeouts and retries for a non-responding
+service.
 
-**3. When to extract Inventory into its own microservice.**
-It's worth splitting out once Inventory needs to scale, deploy, or evolve
-independently of Order — for example, if Inventory needs a much higher
-read throughput (real-time stock lookups from many services), gets updated
-by other systems too (a warehouse or POS integration), or needs a different
-on-call/release cadence than Order. Doing it would mean: replacing the
-constructor-injected `InventoryService` call with an HTTP (or messaging)
-client behind the same interface shape, moving `inventory`/`InventoryItem`
-into Inventory's own database, adding resilience (timeouts, retries,
-circuit breaking), and redesigning `OrderService.placeOrder` so that a
-reservation and an order write are no longer one local transaction — most
-likely reserve-then-confirm with compensation if the order write later
-fails.
+**2. Event coupling to Notification vs. a direct call.**
 
----
+`OrderService` never imports anything from `edu.cit.berou.notification` —
+it publishes `OrderPlacedEvent`/`OrderRejectedEvent` via
+`ApplicationEventPublisher`, and `OrderEventListener` in Notification
+listens with `@EventListener`. That's a one-way dependency: Notification
+could be deleted or rewired without touching Order's logic. Listeners run
+synchronously today, inline in the same transaction as the publisher, so a
+notification only persists if the order's transaction commits — I kept
+this deliberately, so the log never shows a confirmation that later rolled
+back. If I wanted it non-blocking I'd use
+`@TransactionalEventListener(phase = AFTER_COMMIT)` instead of plain
+`@Async`, to keep that guarantee. If Notification became its own service,
+in-process events wouldn't reach it — I'd need a message broker (e.g.
+RabbitMQ/Kafka), at-least-once delivery with an idempotent listener, and
+an outbox table so publishing the event and committing the order write
+stay atomic even though the broker call isn't part of the DB transaction.
+
+**3. Which module to extract first.**
+
+I'd pick **Notification**. It already has the weakest coupling — Order and
+Inventory only publish events and don't know it exists — so extracting it
+doesn't force a redesign of the other two modules. Inventory sits on every
+order's critical path and depends on sharing a transaction with Order via
+its pessimistic lock; pulling it out first means solving the distributed-
+transaction problem from question 1 immediately. Extracting Notification
+just means swapping the in-process `@EventListener` for a queue consumer
+(via an outbox) — the order/cancel write path doesn't change at all.
 
 ## Submission checklist
 
 - [ ] Push this repo to GitHub (confirm `.env` files are **not** committed —
       check with `git status` / `.gitignore`)
-- [ ] Add `docs/network-confirmed.png` and `docs/network-rejected.png`
+- [ ] Run `sql/schema.sql` against Supabase and confirm the app starts
+      cleanly against it
+- [ ] Capture the four Network tab screenshots in Section 5 and add them
+      under `docs/`
+- [ ] Review the reflection in Section 6 — it's a draft grounded in the
+      actual code, but put it in your own words before submitting, the same
+      way you did for the Lab 1 reflection
 - [ ] Fill in your actual GitHub repo link when submitting
+
+
+Monolith Lab:
+Test and capture Network tab evidence for:
+A multi-item order where all items succeed (CONFIRMED)
+-![alt text](<Screenshot 2026-09-17 200048.png>)
+
+A multi-item order where one item fails and the whole order is REJECTED with no partial reservation
+-![alt text](image-1.png)
+
+A cancel with restock reflected in GET /api/inventory afterward
+-
+
+The notification feed showing a confirmed order, a rejected order, and a low-stock alert

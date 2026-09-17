@@ -2,10 +2,19 @@ package edu.cit.berou.shop.dto;
 
 import edu.cit.berou.inventory.dto.InventorySnapshot;
 
+import java.util.List;
+
 /**
- * { status, reason, inventory } as required by the spec. "inventory" reuses
- * InventorySnapshot directly - that record is part of InventoryService's
- * public contract, so the Order module is allowed to depend on it.
+ * { status, reason, items, inventory } as required by the spec. "items"
+ * reports the per-line-item outcome; "inventory" is the updated snapshot
+ * of every product touched by this order (empty on rejection since
+ * nothing was reserved).
  */
-public record OrderResponse(String status, String reason, InventorySnapshot inventory) {
+public record OrderResponse(
+        Long orderId,
+        String status,
+        String reason,
+        List<OrderItemOutcome> items,
+        List<InventorySnapshot> inventory
+) {
 }

@@ -13,22 +13,19 @@ public interface InventoryService {
 
     /**
      * Reads the current state of a product.
-     *
-     * @param productId the product to look up
-     * @return a snapshot of product id, name, and current stock
-     * @throws edu.cit.berou.inventory.service.ProductNotFoundException if the product doesn't exist
      */
     InventorySnapshot getItem(String productId);
 
     /**
      * Attempts to reserve (decrement) stock for a product as part of placing
      * an order. Rejects the reservation if the requested quantity exceeds
-     * available stock.
-     *
-     * @param productId the product to reserve stock for
-     * @param quantity  the quantity requested
-     * @return the resulting inventory snapshot after the reservation attempt,
-     *         plus whether it succeeded
+     * available stock. May also publish a LowStockEvent if the remaining
+     * stock drops below the configured threshold.
      */
     ReservationResult reserve(String productId, int quantity);
+
+    /**
+     * Returns quantity to stock, e.g. when an order is cancelled.
+     */
+    InventorySnapshot restock(String productId, int quantity);
 }
