@@ -202,3 +202,18 @@ A cancel with restock reflected in GET /api/inventory afterward
 -
 
 The notification feed showing a confirmed order, a rejected order, and a low-stock alert
+## Lab 3 — LegacySupply integration (supplier module)
+
+New module `edu.cit.berou.supplier` is an Anti-Corruption Layer around LegacySupply (XML, its own SKUs and
+units, unreliable). Only `SupplierGateway` and our own domain types are public; the low-stock rule
+(`edu.cit.berou.reorder.AutoReorderRule`) calls the gateway, and Inventory restocks by listening to
+`SupplierOrderDelivered`. Details, measurements and design decisions: see [INTEGRATION.md](INTEGRATION.md).
+
+Setup:
+
+1. In the Supabase SQL Editor run `sql/supplier.sql` (after `sql/schema.sql`) and fill in the
+   `supplier_item_map` rows from your own `GET /catalog`.
+2. Set `LS_CLIENT_ID` (your student ID) and `LS_API_KEY` as environment variables (see `backend/.env.example`).
+   The key is never committed.
+3. Run the backend as before. Endpoints for evidence: `GET /api/supplier-orders`, and
+   `POST /api/supplier-orders/reorders` with `{"productId":"P100","units":30}` to trigger a reorder manually.
