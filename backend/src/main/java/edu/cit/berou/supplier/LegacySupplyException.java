@@ -1,18 +1,11 @@
 package edu.cit.berou.supplier;
 
-/**
- * Everything that can go wrong talking to LegacySupply, boiled down to what
- * the rest of the module needs to decide: retry later, fix configuration,
- * or give up on this order. Package-private on purpose.
- */
+
 class LegacySupplyException extends RuntimeException {
 
     enum Kind {
-        /** Timeout, refused connection, 5xx, quota. The order is fine; try again later. */
         TRANSIENT,
-        /** Our credentials/configuration are wrong. Not the order's fault; keep it PENDING. */
         CREDENTIALS,
-        /** LegacySupply understood us and said no (4xx). Retrying the same request is pointless. */
         REJECTED
     }
 
@@ -30,12 +23,12 @@ class LegacySupplyException extends RuntimeException {
         this.retryable = retryable;
     }
 
-    /** Worth retrying immediately (with backoff). */
+    
     static LegacySupplyException transientFailure(String message, Throwable cause) {
         return new LegacySupplyException(Kind.TRANSIENT, null, 0, true, message, cause);
     }
 
-    /** Transient, but do NOT retry right now (quota, interruption). */
+    
     static LegacySupplyException backOff(String message) {
         return new LegacySupplyException(Kind.TRANSIENT, null, 0, false, message, null);
     }

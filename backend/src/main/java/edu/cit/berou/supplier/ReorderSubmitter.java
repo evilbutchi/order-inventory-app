@@ -1,28 +1,20 @@
 package edu.cit.berou.supplier;
 
-import jakarta.annotation.PreDestroy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
-/**
- * Sends PENDING supplier orders to LegacySupply. Two triggers, one code path:
- *  1. right after a reorder is recorded (background thread, so the customer's
- *     order request is never held up by the supplier), and
- *  2. a @Scheduled job that sweeps whatever is still PENDING - that is how an
- *     outage, a timeout or an app restart never loses a reorder.
- *
- * Nothing here can create a duplicate: the row already holds the requestId
- * and the exact case count, and both are sent unchanged on every attempt.
- */
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import jakarta.annotation.PreDestroy;
+
+
 @Component
 class ReorderSubmitter {
 
@@ -50,7 +42,6 @@ class ReorderSubmitter {
         this.batchSize = batchSize;
     }
 
-    /** Fire-and-forget: send this order on the background thread. */
     void enqueue(long orderId) {
         try {
             executor.execute(() -> {
@@ -65,7 +56,6 @@ class ReorderSubmitter {
         }
     }
 
-    /** Safety net: retry everything still PENDING. */
     @Scheduled(initialDelayString = "${supplier.pending-initial-delay-ms:5000}",
             fixedDelayString = "${supplier.pending-retry-ms:15000}")
     public void retryPending() {
@@ -79,7 +69,7 @@ class ReorderSubmitter {
             try {
                 if (submit(o.getId()) == Outcome.RETRY_LATER) {
                     log.info("Supplier still unavailable; leaving the rest PENDING until the next run");
-                    break; // do not hammer a service that is down
+                    break; 
                 }
             } catch (RuntimeException e) {
                 log.error("Unexpected error submitting supplier order {}; it stays PENDING", o.getId(), e);
@@ -87,10 +77,7 @@ class ReorderSubmitter {
         }
     }
 
-    /**
-     * One at a time (synchronized): the executor and the scheduler may both
-     * pick up the same row, and the second one must see it already sent.
-     */
+    
     synchronized Outcome submit(long orderId) {
         SupplierOrder order = orders.findById(orderId).orElse(null);
         if (order == null || order.getStatus() != SupplierOrderStatus.PENDING) {

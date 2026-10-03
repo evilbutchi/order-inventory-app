@@ -25,7 +25,7 @@ public class Notification {
     private Instant createdAt;
 
     protected Notification() {
-        // required by JPA
+        
     }
 
     public Notification(String message, Instant createdAt) {

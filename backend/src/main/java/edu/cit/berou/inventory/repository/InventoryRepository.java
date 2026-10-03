@@ -10,12 +10,7 @@ import java.util.Optional;
 
 public interface InventoryRepository extends JpaRepository<InventoryItem, String> {
 
-    /**
-     * Pessimistic write lock so concurrent reservations against the same
-     * product_id can't both read stale stock and both succeed. Fine for an
-     * academic project's scale; a real system might use optimistic locking
-     * with a @Version column instead.
-     */
+    
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from InventoryItem i where i.productId = :productId")
     Optional<InventoryItem> findByIdForUpdate(String productId);

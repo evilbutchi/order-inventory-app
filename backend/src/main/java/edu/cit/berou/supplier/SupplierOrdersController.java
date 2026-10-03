@@ -1,5 +1,8 @@
 package edu.cit.berou.supplier;
 
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -9,14 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
 
-/**
- * Small read endpoint for your evidence (README / REFLECTION) plus a manual
- * trigger for testing the gateway without having to sell stock down first.
- * Speaks only our terms.
- */
 @RestController
 @RequestMapping("/api/supplier-orders")
 class SupplierOrdersController {

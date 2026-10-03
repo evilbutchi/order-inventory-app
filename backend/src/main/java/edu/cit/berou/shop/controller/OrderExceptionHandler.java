@@ -13,10 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Turns @Valid failures and order-specific exceptions into readable JSON
- * bodies instead of raw error pages.
- */
+
 @RestControllerAdvice
 public class OrderExceptionHandler {
 
@@ -32,9 +29,9 @@ public class OrderExceptionHandler {
 
     @ExceptionHandler(ReservationConflictException.class)
     public ResponseEntity<OrderResponse> handleReservationConflict(ReservationConflictException ex) {
-        // The whole placeOrder() transaction already rolled back - nothing
-        // was persisted or reserved, so this is still a plain REJECTED
-        // response, just triggered by a race instead of an up-front check.
+        
+        
+        
         return ResponseEntity.ok(new OrderResponse(null, "REJECTED", ex.getMessage(), List.of(), List.of()));
     }
 

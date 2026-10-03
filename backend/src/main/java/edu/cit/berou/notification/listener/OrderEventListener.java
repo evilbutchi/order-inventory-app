@@ -11,15 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
-/**
- * Notification only ever depends on the event classes published by Order
- * and Inventory - it never calls OrderService or InventoryService, and
- * neither of those modules imports anything from this package. Listeners
- * run synchronously (Spring's default): each one executes inline, inside
- * the same transaction as the publisher, so a notification for a confirmed
- * order only survives if that order's transaction actually commits. Kept
- * synchronous (not @Async) for that reason - see README.
- */
+
 @Component
 class OrderEventListener {
 

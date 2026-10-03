@@ -20,7 +20,7 @@ public class InventoryItem {
     private int stock;
 
     protected InventoryItem() {
-        // required by JPA
+        
     }
 
     public InventoryItem(String productId, String name, int stock) {

@@ -2,6 +2,7 @@ package edu.cit.berou.inventory.service;
 
 import edu.cit.berou.inventory.dto.InventorySnapshot;
 import edu.cit.berou.inventory.entity.InventoryItem;
+import edu.cit.berou.inventory.event.InventoryChangedEvent;
 import edu.cit.berou.inventory.event.LowStockEvent;
 import edu.cit.berou.inventory.repository.InventoryRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,12 +10,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Package-private on purpose: this class is NOT visible outside
- * edu.cit.berou.inventory.service. Spring can still find and wire it via
- * reflection, but no other module's source can import it, reference its
- * type, or new it up. The Order module only ever sees InventoryService.
- */
+import java.util.List;
+
+
 @Service
 class InventoryServiceImpl implements InventoryService {
 
@@ -40,6 +38,20 @@ class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional
+    public InventorySnapshot getItemForUpdate(String productId) {
+        InventoryItem item = inventoryRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
+        return toSnapshot(item);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InventorySnapshot> listAll() {
+        return inventoryRepository.findAll().stream().map(this::toSnapshot).toList();
+    }
+
+    @Override
+    @Transactional
     public ReservationResult reserve(String productId, int quantity) {
         if (quantity <= 0) {
             InventoryItem current = inventoryRepository.findById(productId)
@@ -47,8 +59,8 @@ class InventoryServiceImpl implements InventoryService {
             return ReservationResult.rejected("Quantity must be greater than zero", toSnapshot(current));
         }
 
-        // Locked read so two concurrent orders against the same product
-        // can't both pass the stock check before either commits.
+        
+        
         InventoryItem item = inventoryRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
@@ -60,6 +72,7 @@ class InventoryServiceImpl implements InventoryService {
 
         item.setStock(item.getStock() - quantity);
         inventoryRepository.save(item);
+        events.publishEvent(new InventoryChangedEvent(item.getProductId(), item.getStock()));
 
         if (item.getStock() < lowStockThreshold) {
             events.publishEvent(new LowStockEvent(item.getProductId(), item.getName(),
@@ -76,6 +89,7 @@ class InventoryServiceImpl implements InventoryService {
                 .orElseThrow(() -> new ProductNotFoundException(productId));
         item.setStock(item.getStock() + quantity);
         inventoryRepository.save(item);
+        events.publishEvent(new InventoryChangedEvent(item.getProductId(), item.getStock()));
         return toSnapshot(item);
     }
 

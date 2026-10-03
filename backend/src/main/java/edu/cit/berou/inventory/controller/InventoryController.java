@@ -7,12 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Not required by the assignment spec, but exposed so the React product
- * dropdown has something real to populate from instead of hardcoded values.
- * Reads straight from the repository since this is a simple listing, not a
- * business operation that needs to go through InventoryService.
- */
+
 @RestController
 public class InventoryController {
 

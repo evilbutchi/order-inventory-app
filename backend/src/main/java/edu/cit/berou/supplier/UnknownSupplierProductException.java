@@ -1,6 +1,6 @@
 package edu.cit.berou.supplier;
 
-/** Thrown when a product has no mapping to a supplier item. */
+
 public class UnknownSupplierProductException extends RuntimeException {
 
     private final String productId;

@@ -9,12 +9,7 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
-/**
- * One row per reorder we ever decided to send to the supplier. This table is
- * the source of truth: a reorder exists the moment its row is committed, and
- * requestId is fixed at that moment so every retry, restart or scheduled
- * re-send uses the same X-Request-Id.
- */
+
 @Entity
 @Table(name = "supplier_orders")
 class SupplierOrder {
@@ -52,7 +47,7 @@ class SupplierOrder {
     private Instant updatedAt;
 
     protected SupplierOrder() {
-        // required by JPA
+        
     }
 
     SupplierOrder(Long id, String productId, String buyerRef, String requestId, int cases, int units) {

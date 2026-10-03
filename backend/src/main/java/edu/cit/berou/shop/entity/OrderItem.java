@@ -30,7 +30,7 @@ public class OrderItem {
     private int quantity;
 
     protected OrderItem() {
-        // required by JPA
+        
     }
 
     OrderItem(Order order, String productId, int quantity) {

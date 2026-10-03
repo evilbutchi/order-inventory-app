@@ -2,6 +2,8 @@ package edu.cit.berou.shop.service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,83 +52,60 @@ public class OrderService {
     @Transactional
     public OrderResponse placeOrder(List<OrderItemRequest> requestItems) {
 
-        // ------------------------------------------------------------
-        // 1. Validate the requested items before reserving anything.
-        // ------------------------------------------------------------
         Map<String, String> failures = new LinkedHashMap<>();
 
-        for (OrderItemRequest item : requestItems) {
+        
+        
+        List<OrderItemRequest> reservationOrder = requestItems.stream()
+                .sorted(Comparator.comparing(OrderItemRequest::productId))
+                .toList();
+        Map<String, InventorySnapshot> lockedInventory = new HashMap<>();
+        for (OrderItemRequest item : reservationOrder) {
+            if (item.quantity() <= 0) {
+                failures.putIfAbsent(item.productId(), "Quantity must be greater than zero");
+                continue;
+            }
+            if (lockedInventory.containsKey(item.productId())) {
+                continue;
+            }
             try {
-                InventorySnapshot snapshot =
-                        inventoryService.getItem(item.productId());
-
-                int availableStock = snapshot.stock();
-                int requestedQuantity = item.quantity();
-
-                if (availableStock <= 0) {
-                    failures.put(
-                            item.productId(),
-                            "Out of stock"
-                    );
-                } else if (availableStock < requestedQuantity) {
-                    failures.put(
-                            item.productId(),
-                            "Insufficient stock: requested "
-                                    + requestedQuantity
-                                    + ", available "
-                                    + availableStock
-                    );
-                }
-
+                lockedInventory.put(item.productId(), inventoryService.getItemForUpdate(item.productId()));
             } catch (ProductNotFoundException ex) {
-                failures.put(
-                        item.productId(),
-                        ex.getMessage()
-                );
+                failures.putIfAbsent(item.productId(), ex.getMessage());
             }
         }
 
-        // ------------------------------------------------------------
-        // 2. If any item cannot be fulfilled, reject the ENTIRE order.
-        //    No inventory is reserved or deducted.
-        // ------------------------------------------------------------
+        Map<String, Long> requestedByProduct = new LinkedHashMap<>();
+        for (OrderItemRequest item : requestItems) {
+            requestedByProduct.merge(item.productId(), (long) item.quantity(), Long::sum);
+        }
+        for (Map.Entry<String, Long> requested : requestedByProduct.entrySet()) {
+            InventorySnapshot inventory = lockedInventory.get(requested.getKey());
+            if (inventory == null || failures.containsKey(requested.getKey())) {
+                continue;
+            }
+            if (inventory.stock() <= 0) {
+                failures.put(requested.getKey(), "Out of stock");
+            } else if (inventory.stock() < requested.getValue()) {
+                failures.put(requested.getKey(),
+                        "Insufficient stock: requested " + requested.getValue()
+                                + ", available " + inventory.stock());
+            }
+        }
+
         if (!failures.isEmpty()) {
             return rejectOrder(requestItems, failures);
         }
 
-        // ------------------------------------------------------------
-        // 3. All items have enough stock.
-        //    Reserve them now.
-        // ------------------------------------------------------------
-        Order order = new Order(
-                CONFIRMED,
-                null,
-                Instant.now()
-        );
-
+        Order order = new Order(CONFIRMED, null, Instant.now());
         List<OrderItemOutcome> outcomes = new ArrayList<>();
         List<InventorySnapshot> touchedInventory = new ArrayList<>();
-
         for (OrderItemRequest item : requestItems) {
-
-            ReservationResult result =
-                    inventoryService.reserve(
-                            item.productId(),
-                            item.quantity()
-                    );
-
-            // This means stock changed between validation and reservation.
-            // Keep this as an actual conflict because it is different from
-            // a normal "out of stock" order rejection.
+            ReservationResult result = inventoryService.reserve(item.productId(), item.quantity());
             if (!result.success()) {
                 throw new ReservationConflictException(
-                        "Stock for "
-                                + item.productId()
-                                + " changed before the order could be completed: "
-                                + result.reason()
-                );
+                        "Locked stock for " + item.productId() + " changed before reservation: " + result.reason());
             }
-
             order.addItem(
                     item.productId(),
                     item.quantity()
@@ -138,15 +117,12 @@ public class OrderService {
                             "RESERVED"
                     )
             );
-
-            touchedInventory.add(
-                    result.inventory()
-            );
+            touchedInventory.add(result.inventory());
         }
 
-        // ------------------------------------------------------------
-        // 4. Save confirmed order.
-        // ------------------------------------------------------------
+        
+        
+        
         orderRepository.save(order);
 
         events.publishEvent(
@@ -165,14 +141,7 @@ public class OrderService {
         );
     }
 
-    /**
-     * Creates a normal REJECTED order.
-     *
-     * Important:
-     * - No inventory is deducted.
-     * - The rejection is stored in the orders table.
-     * - The order can still appear in the order history.
-     */
+    
     private OrderResponse rejectOrder(
             List<OrderItemRequest> requestItems,
             Map<String, String> failures
@@ -305,4 +274,3 @@ public class OrderService {
         );
     }
 }
-

@@ -32,14 +32,14 @@ public class Order {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    // Line items now live in their own table (an order can span several
-    // products). cascade = ALL + orphanRemoval so saving/removing the Order
-    // saves/removes its items too - callers never persist OrderItem directly.
+    
+    
+    
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> items = new ArrayList<>();
 
     protected Order() {
-        // required by JPA
+        
     }
 
     public Order(String status, String reason, Instant createdAt) {

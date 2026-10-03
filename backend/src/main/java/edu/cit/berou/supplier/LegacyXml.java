@@ -1,37 +1,31 @@
 package edu.cit.berou.supplier;
 
+import java.io.IOException;
+import java.io.StringReader;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import java.io.IOException;
-import java.io.StringReader;
 
-/**
- * All XML for LegacySupply lives here: how we build requests and how we read
- * responses. Plain JDK DOM parsing - no extra dependency, and (unlike adding
- * jackson-dataformat-xml) it cannot change how the rest of the app's REST
- * endpoints negotiate JSON vs XML.
- */
 final class LegacyXml {
 
-    /** A PurchaseOrderAck / PurchaseOrderStatus document. statusCode is -1 if not a number. */
     record PoDoc(String poNumber, int statusCode, String sku, int qty, String uom, String buyerRef) {
     }
 
-    /** An LSError document. */
     record ErrDoc(String code, String message) {
     }
 
     private LegacyXml() {
     }
 
-    // ---- requests -------------------------------------------------------
+    
 
     static String authRequest(String clientId, String apiKey) {
         return "<AuthRequest><ClientId>" + esc(clientId) + "</ClientId><ApiKey>" + esc(apiKey)
@@ -43,7 +37,7 @@ final class LegacyXml {
                 + "</Qty><BuyerRef>" + esc(buyerRef) + "</BuyerRef></PurchaseOrder>";
     }
 
-    // ---- responses ------------------------------------------------------
+    
 
     static String parseSessionToken(String xml) {
         String token = text(root(xml), "SessionToken");
@@ -67,7 +61,7 @@ final class LegacyXml {
                 text(r, "BuyerRef"));
     }
 
-    /** Never throws: an unreadable error body just becomes code "UNKNOWN". */
+   
     static ErrDoc parseError(String xml) {
         try {
             Element r = root(xml);
@@ -79,7 +73,6 @@ final class LegacyXml {
         }
     }
 
-    // ---- helpers --------------------------------------------------------
 
     private static Element root(String xml) {
         if (xml == null || xml.isBlank()) {
@@ -90,7 +83,7 @@ final class LegacyXml {
             f.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             var builder = f.newDocumentBuilder();
-            builder.setErrorHandler(new DefaultHandler()); // quiet: we report problems ourselves
+            builder.setErrorHandler(new DefaultHandler()); 
             return builder.parse(new InputSource(new StringReader(xml))).getDocumentElement();
         } catch (ParserConfigurationException | SAXException | IOException e) {
             throw LegacySupplyException.transientFailure("Malformed XML from LegacySupply", e);

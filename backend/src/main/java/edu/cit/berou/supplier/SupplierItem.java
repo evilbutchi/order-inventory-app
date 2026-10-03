@@ -5,11 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/**
- * Our product id -> LegacySupply's SupplierSku and PackSize. Owned by the
- * supplier module (NOT stored in Inventory) so supplier vocabulary never
- * leaks into the Inventory schema or code. Seeded from sql/supplier.sql.
- */
+
 @Entity
 @Table(name = "supplier_item_map")
 class SupplierItem {
@@ -25,7 +21,7 @@ class SupplierItem {
     private int packSize;
 
     protected SupplierItem() {
-        // required by JPA
+        
     }
 
     String getProductId() {

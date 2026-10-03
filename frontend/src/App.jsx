@@ -55,7 +55,7 @@ function App() {
   useEffect(() => {
     refreshAll()
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [])
 
   const stockFor = (productId) =>

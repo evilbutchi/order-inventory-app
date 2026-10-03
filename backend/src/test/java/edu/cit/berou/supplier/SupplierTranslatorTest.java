@@ -10,9 +10,9 @@ class SupplierTranslatorTest {
 
     @Test
     void roundsUnitsUpToWholeCases() {
-        assertEquals(3, SupplierTranslator.casesFor(30, 12)); // 30 units -> 3 cases (36 units arrive)
-        assertEquals(2, SupplierTranslator.casesFor(24, 12)); // exact multiple stays exact
-        assertEquals(1, SupplierTranslator.casesFor(1, 12));  // never zero
+        assertEquals(3, SupplierTranslator.casesFor(30, 12)); 
+        assertEquals(2, SupplierTranslator.casesFor(24, 12)); 
+        assertEquals(1, SupplierTranslator.casesFor(1, 12));  
     }
 
     @Test
